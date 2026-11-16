@@ -97,10 +97,11 @@ else
         for i in $(seq 1 30); do pgrep -u "$OWNER" -f "$BASE/supervisor" >/dev/null || break; sleep 1; done
         pkill -9 -u "$OWNER" -f "$BASE/supervisor" 2>/dev/null
         sleep 2
-        (cd /tmp && env HOME="$HOMEDIR" USER="$(basename "$HOMEDIR")" \
+        # setsid + full redirect: fully detach so the script can exit
+        (cd /tmp && setsid env HOME="$HOMEDIR" USER="$(basename "$HOMEDIR")" \
             setpriv --reuid="$OWNER" --regid="$GROUP" --clear-groups \
-            bash -c "cd '$BASE' && ./supervisor run --conf '$BASE/supervisor.yaml'" \
-            > /tmp/acunetix.log 2>&1 &)
+            bash -c "cd '$BASE' && exec ./supervisor run --conf '$BASE/supervisor.yaml'" \
+            > /tmp/acunetix.log 2>&1 < /dev/null &) > /dev/null 2>&1
     done
 fi
 
@@ -126,7 +127,7 @@ if [ ! -x "$CF" ]; then
 fi
 pkill -f "$CF tunnel" 2>/dev/null; sleep 1
 : > "$CFLOG"
-nohup "$CF" tunnel --no-autoupdate --url https://localhost:3443 --no-tls-verify > "$CFLOG" 2>&1 &
+setsid nohup "$CF" tunnel --no-autoupdate --url https://localhost:3443 --no-tls-verify > "$CFLOG" 2>&1 < /dev/null &
 URL=""
 for i in $(seq 1 30); do
     URL=$(grep -o 'https://[a-z0-9-]*\.trycloudflare\.com' "$CFLOG" | head -1)
